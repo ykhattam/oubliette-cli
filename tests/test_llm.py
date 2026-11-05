@@ -34,7 +34,7 @@ def test_send_to_llm_connection_refused(mock_port):
 @patch("oubliette.llm._is_port_in_use", return_value=False)
 @patch("oubliette.llm.subprocess.Popen")
 @patch("oubliette.llm.time.sleep")
-def test_send_to_llm_lazy_starts_server(mock_sleep, mock_popen, mock_port):
+def test_send_to_llm_auto_starts_server(mock_sleep, mock_popen, mock_port):
     """Verify server is started if port is closed."""
     # Simulate port opening after start
     mock_port.side_effect = [False, True] 
@@ -47,4 +47,4 @@ def test_send_to_llm_lazy_starts_server(mock_sleep, mock_popen, mock_port):
         result = send_to_llm("test")
         
     assert result == "ok"
-    mock_popen.assert_called_once() # Verify server was spawned
+    mock_popen.assert_called_once()

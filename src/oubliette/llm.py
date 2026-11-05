@@ -1,5 +1,5 @@
 """
-llm.py - Local llama.cpp server router with lazy-start capability.
+llm.py - Local llama.cpp server router with auto-start capability.
 """
 import os
 import time
@@ -7,7 +7,7 @@ import socket
 import subprocess
 import requests
 
-ENDPOINT = os.environ.get("OUBLIETTE_LLM_ENDPOINT", "http://localhost:8080/v1/chat/completions")
+ENDPOINT = os.environ.get("OUBLIETTE_LLM_ENDPOINT", "http://127.0.0.1:8080/v1/chat/completions")
 MODEL = os.environ.get("OUBLIETTE_MODEL", "default")
 LLAMA_BIN = os.environ.get("OUBLIETTE_LLAMA_BIN", "llama-server")
 MODEL_PATH = os.environ.get("OUBLIETTE_MODEL_PATH", "models/qwen2.5-7b-instruct-q4_k_m.gguf")
@@ -24,33 +24,40 @@ def _is_port_in_use(port: int) -> bool:
 def _start_llama_server():
     """Spawn llama-server in the background detached from the terminal."""
     print("[oubliette] Server not detected. Starting llama-server in background...")
+    
+    port = 8080
     cmd = [
         LLAMA_BIN,
         "-m", MODEL_PATH,
         "--host", "127.0.0.1",
-        "--port", "8080",
+        "--port", str(port),
         "--ctx-size", "8192",
-        "--n-gpu-layers", "99" # Adjust based on your hardware
+        "--n-gpu-layers", "99"  # Offload to GPU if available
     ]
+    
+    # Start detached process (survives if CLI exits)
     subprocess.Popen(
         cmd,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
-        start_new_session=True # Detaches process so it survives if CLI exits
+        start_new_session=True
     )
     
-    # Poll for port to open (max 30 seconds)
-    for _ in range(30):
-        if _is_port_in_use(8080):
-            time.sleep(3) # Give model 3 extra seconds to load into VRAM
+    # Poll for port to open (max 120 seconds for model load)
+    print("[oubliette] Waiting for model to load (up to 120s)...")
+    for _ in range(120):
+        if _is_port_in_use(port):
+            time.sleep(3)  # Give model 3 extra seconds to fully initialize
+            print("[oubliette] Model loaded and ready.")
             return
         time.sleep(1)
-    raise LLMError("Timeout waiting for llama-server to start on port 8080.")
+        
+    raise LLMError("Timeout waiting for llama-server to start. Verify OUBLIETTE_LLAMA_BIN and OUBLIETTE_MODEL_PATH.")
 
 def send_to_llm(prompt: str, system: str = None) -> str:
     """Sends prompt to the running (or newly started) llama-server instance."""
-    # Lazy start: if port 8080 is closed, start the server
-    if not _is_port_in_use(8080):
+    port = 8080
+    if not _is_port_in_use(port):
         _start_llama_server()
 
     messages = []
@@ -67,7 +74,8 @@ def send_to_llm(prompt: str, system: str = None) -> str:
     }
     
     try:
-        response = requests.post(ENDPOINT, json=payload, timeout=120) # 120s for first token
+        # 120s timeout for first token generation
+        response = requests.post(ENDPOINT, json=payload, timeout=120)
         response.raise_for_status()
         data = response.json()
         return data["choices"][0]["message"]["content"].strip()
