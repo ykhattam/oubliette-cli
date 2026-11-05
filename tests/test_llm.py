@@ -1,62 +1,50 @@
 """
-test_llm.py - Verification of local llama.cpp runner.
+test_llm.py - Verification of local llama.cpp server router.
 """
 import pytest
-import subprocess
+import requests
 from unittest.mock import patch, MagicMock
 from oubliette.llm import send_to_llm, LLMError
 
-def test_send_to_llm_subprocess_success():
-    """Verify successful subprocess execution."""
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = "def hello():\n    pass"
-    mock_result.stderr = ""
+@patch("oubliette.llm._is_port_in_use", return_value=True)
+def test_send_to_llm_success(mock_port):
+    """Verify successful response from server."""
+    mock_response = MagicMock()
+    mock_response.json.return_value = {
+        "choices": [{"message": {"content": "Code looks good."}}]
+    }
+    mock_response.raise_for_status.return_value = None
     
-    with patch("oubliette.llm.subprocess.run", return_value=mock_result) as mock_run:
-        result = send_to_llm("write a function")
+    with patch("oubliette.llm.requests.post", return_value=mock_response):
+        result = send_to_llm("test prompt")
         
-    assert result == "def hello():\n    pass"
-    mock_run.assert_called_once()
-    call_args = mock_run.call_args[0][0]
-    assert "llama-cli" in call_args[0]
-    assert "-p" in call_args
+    assert result == "Code looks good."
 
-def test_send_to_llm_with_system_prompt():
-    """Verify system prompt is prepended correctly."""
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = "ok"
+@patch("oubliette.llm._is_port_in_use", return_value=True)
+def test_send_to_llm_connection_refused(mock_port):
+    """Verify connection error raises LLMError."""
+    with patch(
+        "oubliette.llm.requests.post",
+        side_effect=requests.exceptions.ConnectionError(),
+    ):
+        with pytest.raises(LLMError) as exc_info:
+            send_to_llm("test")
+    assert "Cannot reach llama-server" in str(exc_info.value)
+
+@patch("oubliette.llm._is_port_in_use", return_value=False)
+@patch("oubliette.llm.subprocess.Popen")
+@patch("oubliette.llm.time.sleep")
+def test_send_to_llm_lazy_starts_server(mock_sleep, mock_popen, mock_port):
+    """Verify server is started if port is closed."""
+    # Simulate port opening after start
+    mock_port.side_effect = [False, True] 
     
-    with patch("oubliette.llm.subprocess.run", return_value=mock_result) as mock_run:
-        send_to_llm("user prompt", system="system prompt")
+    mock_response = MagicMock()
+    mock_response.json.return_value = {"choices": [{"message": {"content": "ok"}}]}
+    mock_response.raise_for_status.return_value = None
+    
+    with patch("oubliette.llm.requests.post", return_value=mock_response):
+        result = send_to_llm("test")
         
-    call_args = mock_run.call_args[0][0]
-    prompt_idx = call_args.index("-p") + 1
-    assert "System: system prompt" in call_args[prompt_idx]
-    assert "User: user prompt" in call_args[prompt_idx]
-
-def test_send_to_llm_subprocess_failure():
-    """Verify subprocess failure raises LLMError."""
-    mock_result = MagicMock()
-    mock_result.returncode = 1
-    mock_result.stderr = "error: model not found"
-    
-    with patch("oubliette.llm.subprocess.run", return_value=mock_result):
-        with pytest.raises(LLMError) as exc_info:
-            send_to_llm("test")
-    assert "llama.cpp failed" in str(exc_info.value)
-
-def test_send_to_llm_file_not_found():
-    """Verify missing binary raises LLMError."""
-    with patch("oubliette.llm.subprocess.run", side_effect=FileNotFoundError):
-        with pytest.raises(LLMError) as exc_info:
-            send_to_llm("test")
-    assert "not found" in str(exc_info.value)
-
-def test_send_to_llm_timeout():
-    """Verify timeout raises LLMError."""
-    with patch("oubliette.llm.subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="llama-cli", timeout=60)):
-        with pytest.raises(LLMError) as exc_info:
-            send_to_llm("test")
-    assert "timed out" in str(exc_info.value)
+    assert result == "ok"
+    mock_popen.assert_called_once() # Verify server was spawned
