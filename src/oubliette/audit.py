@@ -11,7 +11,6 @@ LOG_FILE = LOG_DIR / "audit.log"
 MAX_LOG_SIZE_BYTES = 10 * 1024 * 1024
 
 def _ensure_log_dir():
-    """Create .paranoid/ directory with strict permissions."""
     LOG_DIR.mkdir(mode=0o700, exist_ok=True)
     if not LOG_FILE.exists():
         LOG_FILE.touch(mode=0o600)
