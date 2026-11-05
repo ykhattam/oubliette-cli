@@ -1,106 +1,54 @@
 """
-llm.py - Local Ollama router with streaming.
+llm.py - Direct llama.cpp CLI runner (No HTTP/TCP overhead)
 """
-import time
-import json
-import requests
-
-# Hard-coded local endpoint. No env var override. No cloud fallback.
-OLLAMA_URL = "http://localhost:11434/v1/chat/completions"
-PER_TOKEN_TIMEOUT_SECONDS = 30
-REQUEST_TIMEOUT_SECONDS = 60
+import os
+import subprocess
 
 class LLMError(Exception):
     """Raised when LLM communication fails."""
     pass
 
-class LLMTimeoutError(LLMError):
-    """Raised when per-token timeout is exceeded."""
-    pass
-
-def _parse_sse_line(line: str) -> str | None:
-    """
-    Parse one SSE line. Return content delta or None.
-    Returns empty string on [DONE] signal.
-    """
-    line = line.strip()
-    if not line or not line.startswith("data:"):
-        return None
-    
-    payload = line[len("data:"):].strip()
-    
-    if payload == "[DONE]":
-        return ""
-    
-    try:
-        data = json.loads(payload)
-    except json.JSONDecodeError:
-        return None
-    
-    choices = data.get("choices", [])
-    if not choices:
-        return None
-    
-    delta = choices[0].get("delta", {})
-    return delta.get("content", "")
-
 def send_to_llm(prompt: str, system: str = None) -> str:
     """
-    Send prompt to local Ollama, stream response.
-    Returns concatenated content. Raises LLMError on failure.
+    Executes local llama.cpp binary directly via subprocess.
+    Bypasses local HTTP sockets entirely. Zero network stack.
     """
-    messages = []
-    if system:
-        messages.append({"role": "system", "content": system})
-    messages.append({"role": "user", "content": prompt})
+    # External control for speed/model swapping
+    model_path = os.environ.get("OUBLIETTE_MODEL_PATH", "models/qwen2.5-coder.gguf")
+    llama_bin = os.environ.get("OUBLIETTE_LLAMA_BIN", "llama-cli")
     
-    payload = {
-        "model": "qwen2.5-coder:latest",
-        "messages": messages,
-        "stream": True,
-    }
+    full_prompt = prompt
+    if system:
+        full_prompt = f"System: {system}\n\nUser: {prompt}"
+        
+    # llama.cpp CLI arguments for fast, clean code generation
+    cmd = [
+        llama_bin,
+        "-m", model_path,
+        "-p", full_prompt,
+        "-n", "512",          # Max tokens
+        "--temp", "0.2",      # Low temperature for deterministic code
+        "--no-display-prompt" # Prevent echoing input in output
+    ]
     
     try:
-        response = requests.post(
-            OLLAMA_URL,
-            json=payload,
-            stream=True,
-            timeout=REQUEST_TIMEOUT_SECONDS,
+        # subprocess.run is safer and cleaner than Popen for single-turn
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=60  # Hard 60s timeout prevents hangs
         )
-        response.raise_for_status()
-    except requests.exceptions.ConnectionError:
-        raise LLMError(
-            f"Cannot reach Ollama at {OLLAMA_URL}. "
-            "Verify Ollama is running locally."
-        )
-    except requests.exceptions.Timeout:
-        raise LLMError("Initial connection to Ollama timed out.")
-    except requests.exceptions.HTTPError as e:
-        raise LLMError(f"Ollama returned error: {e}")
-    
-    content_parts = []
-    last_token_time = time.time()
-    
-    for line in response.iter_lines(decode_unicode=True):
-        now = time.time()
-        if (now - last_token_time) > PER_TOKEN_TIMEOUT_SECONDS:
-            raise LLMTimeoutError(
-                f"No token received for {PER_TOKEN_TIMEOUT_SECONDS}s. "
-                "Local model may be stalled."
-            )
         
-        if line is None:
-            continue
+        if result.returncode != 0:
+            raise LLMError(f"llama.cpp failed: {result.stderr.strip()}")
+            
+        return result.stdout.strip()
         
-        parsed = _parse_sse_line(line)
-        
-        if parsed is None:
-            continue
-        
-        if parsed == "":
-            break
-        
-        content_parts.append(parsed)
-        last_token_time = now
-    
-    return "".join(content_parts)
+    except FileNotFoundError:
+        raise LLMError(f"Binary '{llama_bin}' not found. Install llama.cpp or set OUBLIETTE_LLAMA_BIN.")
+    except subprocess.TimeoutExpired:
+        raise LLMError("Local model execution timed out after 60s.")
+    except Exception as e:
+        raise LLMError(f"Failed executing local model: {e}")
