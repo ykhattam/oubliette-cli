@@ -1,0 +1,20 @@
+oubliette/
+├── PLAN.md                  # This file
+├── README.md                # Project philosophy + install
+├── LICENSE                  # Apache 2.0
+├── .gitignore               # Includes .paranoid/, *.env, *.key
+├── pyproject.toml           # Minimal deps: requests, rich (for diff)
+├── src/
+│   └── oubliette/
+│       ├── __init__.py
+│       ├── cli.py           # Entry point (argparse)
+│       ├── gate.py          # Path resolve + blocklist + regex
+│       ├── audit.py         # JSON-lines logger (metadata only)
+│       ├── llm.py           # Ollama streaming router
+│       └── writer.py        # Atomic file writer with diff
+├── tests/
+│   ├── test_gate.py         # Path traversal + symlink tests
+│   ├── test_writer.py       # Cross-device atomicity tests
+│   └── fixtures/            # Sanitized mock data only
+└── .paranoid/               # Created at runtime, gitignored
+    └── audit.log
