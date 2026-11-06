@@ -75,7 +75,9 @@ def write_file_atomic(target_path: str, content: str, require_approval: bool = T
     
     # 5. Write to temp file in SAME directory (prevents EXDEV)
     target_dir = resolved.parent
+    tmp_path = None
     try:
+        target_dir.mkdir(parents=True, exist_ok=True)
         with tempfile.NamedTemporaryFile(
             mode="w",
             dir=target_dir,
@@ -85,6 +87,8 @@ def write_file_atomic(target_path: str, content: str, require_approval: bool = T
             tmp.write(content)
             tmp_path = Path(tmp.name)
     except OSError as e:
+        if tmp_path is not None and tmp_path.exists():
+            tmp_path.unlink()
         raise WriteError(f"Failed to create temp file: {e}")
     
     # 6. Atomic replace
@@ -92,7 +96,7 @@ def write_file_atomic(target_path: str, content: str, require_approval: bool = T
         os.replace(tmp_path, resolved)
     except OSError as e:
         # Clean up temp file on failure
-        if tmp_path.exists():
+        if tmp_path is not None and tmp_path.exists():
             tmp_path.unlink()
         raise WriteError(f"Atomic replace failed: {e}")
     

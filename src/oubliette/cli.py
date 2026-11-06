@@ -35,7 +35,7 @@ def main():
     args = parser.parse_args()
     
     try:
-        print("[oubliette] Sending to local Ollama...")
+        print("[oubliette] Sending to local LLM server...")
         
         # 1. Read and redact the file
         file_content = _read_and_redact(args.file)

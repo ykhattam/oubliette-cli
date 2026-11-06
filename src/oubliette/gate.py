@@ -19,16 +19,18 @@ BLOCKED_SUBSTRINGS = ("credentials", "service_account", "private_key", "secret_k
 
 # Regex patterns for secret redaction
 REDACTION_PATTERNS = [
-    re.compile(r"AKIA[0-9A-Z]{16}"),             # AWS Access Key ID
-    re.compile(r"ghp_[a-zA-Z0-9]{36}"),          # GitHub Personal Access Token
-    re.compile(r"gho_[a-zA-Z0-9]{36}"),          # GitHub OAuth Token
-    re.compile(r"ghu_[a-zA-Z0-9]{36}"),          # GitHub User-to-Server Token
-    re.compile(r"ghs_[a-zA-Z0-9]{36}"),          # GitHub Server-to-Server Token
-    re.compile(r"ghr_[a-zA-Z0-9]{36}"),          # GitHub Refresh Token
-    re.compile(r"sk-[a-zA-Z0-9]{20,}"),          # Generic Secret Key (OpenAI/Stripe style)
-    re.compile(r"sk_live_[a-zA-Z0-9]{24,}"),     # Stripe Live Key
-    re.compile(r"sk_test_[a-zA-Z0-9]{24,}"),     # Stripe Test Key
-    re.compile(r"-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----"),  # Private keys
+re.compile(r"AKIA[0-9A-Z]{16}"),             # AWS Access Key ID
+re.compile(r"(?<![A-Za-z0-9/+=])[A-Za-z0-9/+=]{40}(?![A-Za-z0-9/+=])"), # AWS Secret Access Key
+re.compile(r"ghp_[a-zA-Z0-9]{36}"),          # GitHub Personal Access Token
+re.compile(r"gho_[a-zA-Z0-9]{36}"),          # GitHub OAuth Token
+re.compile(r"ghu_[a-zA-Z0-9]{36}"),          # GitHub User-to-Server Token
+re.compile(r"ghs_[a-zA-Z0-9]{36}"),          # GitHub Server-to-Server Token
+re.compile(r"ghr_[a-zA-Z0-9]{36}"),          # GitHub Refresh Token
+re.compile(r"sk-[a-zA-Z0-9]{20,}"),          # Generic Secret Key (OpenAI/Stripe style)
+re.compile(r"sk_live_[a-zA-Z0-9]{24,}"),     # Stripe Live Key
+re.compile(r"sk_test_[a-zA-Z0-9]{24,}"),     # Stripe Test Key
+re.compile(r"xoxb-[0-9]{11,13}-[a-zA-Z0-9-]*"), # Slack Token
+re.compile(r"-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----"),  # Private keys
 ]
 
 def check_path_access(path_str: str) -> Path:
