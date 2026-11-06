@@ -35,11 +35,11 @@ def main():
     args = parser.parse_args()
     
     try:
-        print("[oubliette] Sending to local LLM server...")
-        
         # 1. Read and redact the file
         file_content = _read_and_redact(args.file)
-        
+
+        print("[oubliette] Sending to local LLM server...")
+
         # 2. Send to LLM
         system_prompt = "You are a security-focused code reviewer. Be concise and direct."
         full_prompt = f"File content:\n\n{file_content}\n\nUser request: {args.prompt}"

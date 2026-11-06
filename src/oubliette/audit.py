@@ -3,10 +3,14 @@ audit.py - Metadata-only audit logger.
 """
 import json
 import hashlib
+import os
 from pathlib import Path
 from datetime import datetime, timezone
 
-LOG_DIR = Path(".paranoid")
+# Resolution order: OUBLIETTE_AUDIT_DIR, else ./.paranoid in the current directory.
+# The env override exists so a launcher can pin one stable audit trail instead of
+# scattering a .paranoid/ folder into every project you happen to run from.
+LOG_DIR = Path(os.environ.get("OUBLIETTE_AUDIT_DIR", ".paranoid"))
 LOG_FILE = LOG_DIR / "audit.log"
 MAX_LOG_SIZE_BYTES = 10 * 1024 * 1024
 

@@ -26,7 +26,7 @@ re.compile(r"gho_[a-zA-Z0-9]{36}"),          # GitHub OAuth Token
 re.compile(r"ghu_[a-zA-Z0-9]{36}"),          # GitHub User-to-Server Token
 re.compile(r"ghs_[a-zA-Z0-9]{36}"),          # GitHub Server-to-Server Token
 re.compile(r"ghr_[a-zA-Z0-9]{36}"),          # GitHub Refresh Token
-re.compile(r"sk-[a-zA-Z0-9]{20,}"),          # Generic Secret Key (OpenAI/Stripe style)
+re.compile(r"sk-[A-Za-z0-9][A-Za-z0-9_-]{15,}"),  # Generic Secret Key (OpenAI/Stripe style, incl. sk-live-…)
 re.compile(r"sk_live_[a-zA-Z0-9]{24,}"),     # Stripe Live Key
 re.compile(r"sk_test_[a-zA-Z0-9]{24,}"),     # Stripe Test Key
 re.compile(r"xoxb-[0-9]{11,13}-[a-zA-Z0-9-]*"), # Slack Token

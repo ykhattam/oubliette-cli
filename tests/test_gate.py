@@ -47,6 +47,22 @@ def test_preserve_uuids():
     assert uuid in result
     assert count == 0
 
+def test_redact_stripe_style_key_with_dash():
+    """sk-live-… / sk-proj-… keys carry hyphens; the generic sk- rule must still match."""
+    text = 'API_KEY = "sk-live-abcdef1234567890"'
+    result, count = redact_content(text)
+    assert "abcdef1234567890" not in result
+    assert "[REDACTED]" in result
+    assert count == 1
+
+
+def test_redact_openai_project_key():
+    key = "sk-proj-" + "A1b2C3d4" * 5
+    result, count = redact_content(f"OPENAI={key}")
+    assert key not in result
+    assert count >= 1
+
+
 def test_preserve_base64():
     b64 = "SGVsbG8gV29ybGQ="
     text = f"data={b64}"
