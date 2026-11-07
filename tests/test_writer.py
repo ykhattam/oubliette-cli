@@ -132,3 +132,18 @@ def test_write_atomic_on_failure(tmp_path):
     # Verify no temp files left behind
     temp_files = list(tmp_path.glob("*.tmp"))
     assert len(temp_files) == 0
+
+
+def test_strips_wrapping_code_fence(tmp_path):
+    """A fenced code answer must land in the file without ``` lines."""
+    from oubliette.writer import _strip_code_fences
+
+    fenced = "```python\ndef add(a, b):\n    return a + b\n```"
+    assert _strip_code_fences(fenced) == "def add(a, b):\n    return a + b\n"
+
+
+def test_leaves_unfenced_content_alone():
+    from oubliette.writer import _strip_code_fences
+
+    plain = "def add(a, b):\n    return a + b"
+    assert _strip_code_fences(plain) == plain

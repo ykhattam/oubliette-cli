@@ -2,6 +2,7 @@
 writer.py - Atomic file writer with diff preview.
 """
 import os
+import sys
 import tempfile
 import difflib
 from pathlib import Path
@@ -11,6 +12,23 @@ from oubliette.audit import log_event
 class WriteError(Exception):
     """Raised when file write fails or is blocked."""
     pass
+
+def _strip_code_fences(content: str) -> str:
+    """Drop a single wrapping markdown fence the model likes to add.
+
+    Models answer code requests inside ```lang ... ``` blocks. Writing that
+    verbatim puts fence lines into a .py/.js file and breaks it, so the outer
+    fence (and its language tag) is removed when it wraps the whole response.
+    """
+    stripped = content.strip()
+    if not stripped.startswith("```"):
+        return content
+    lines = stripped.splitlines()
+    if len(lines) < 2 or not lines[-1].strip().startswith("```"):
+        return content
+    inner = lines[1:-1]
+    return "\n".join(inner) + "\n"
+
 
 def _generate_diff(original: str, new: str, path: str) -> str:
     """Generate unified diff between original and new content."""
@@ -50,6 +68,19 @@ def write_file_atomic(target_path: str, content: str, require_approval: bool = T
     if resolved.exists():
         with open(resolved, "r") as f:
             original = f.read()
+
+    # Models wrap code answers in ``` fences; strip the outer pair before diffing.
+    content = _strip_code_fences(content)
+
+    # Redaction markers must not silently land on disk as the real value's
+    # replacement — writing back a file whose key now reads [REDACTED] is data
+    # loss, so say so loudly rather than discovering it later.
+    if "[REDACTED]" in content:
+        print(
+            "[oubliette] WARNING: proposed content contains [REDACTED] markers. "
+            "Writing it will overwrite the original secret with this placeholder.",
+            file=sys.stderr,
+        )
     
     # 3. Generate diff
     diff = _generate_diff(original, content, str(resolved))

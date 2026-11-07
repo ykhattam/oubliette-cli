@@ -30,6 +30,26 @@ oubliette --file src/main.py --prompt "Review this code."
 oubliette --file src/main.py --prompt "Add type hints." --write src/main_typed.py
 ```
 
+### Launcher (works from any directory)
+
+`./run.sh` activates the venv itself, pins an absolute model path, and keeps one
+audit trail in `~/.local/state/oubliette` regardless of the directory you invoke
+it from:
+
+```bash
+/print/to/oubliette-cli/run.sh --file src/main.py --prompt "Review this code."
+```
+
+Environment overrides:
+
+| Variable | Purpose | Default |
+|---|---|---|
+| `OUBLIETTE_LLM_ENDPOINT` | OpenAI-compatible chat endpoint | `http://127.0.0.1:8081/v1/chat/completions` |
+| `OUBLIETTE_MODEL_PATH` | GGUF weights for auto-started llama-server | `~/.local/share/oubliette/models/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf` |
+| `OUBLIETTE_MODEL` | `model` field sent to the server | `default` |
+| `OUBLIETTE_AUDIT_DIR` | Audit log directory | `./.paranoid` (set by `run.sh` to the state dir) |
+| `OUBLIETTE_READY_TIMEOUT` | Seconds to wait for model load | `120` |
+
 ### CLI Arguments
 - `--file <path>`: Path to the file to analyze.
 - `--prompt <text>`: Prompt/instructions for the local LLM.
